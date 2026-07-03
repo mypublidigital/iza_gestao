@@ -10,12 +10,18 @@ import { pushRawEvent } from "@/lib/ingest-store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import type { EventType } from "@/lib/types";
 
-const HEADER = "x-chatvolt-secret";
+// O Chatvolt envia o segredo no header "Authorization" (campo "Header → Autorização").
+// Aceitamos também "x-chatvolt-secret" por compatibilidade. Um eventual prefixo "Bearer " é removido.
+function getProvidedSecret(req: Request): string | null {
+  const auth = req.headers.get("authorization");
+  if (auth) return auth.replace(/^Bearer\s+/i, "").trim();
+  return req.headers.get("x-chatvolt-secret");
+}
 
 export async function POST(req: Request) {
   // 1) Validação do header de autenticação (opcional, conforme configurado no Chatvolt).
   const secret = process.env.CHATVOLT_WEBHOOK_SECRET;
-  const provided = req.headers.get(HEADER);
+  const provided = getProvidedSecret(req);
   const authValid = !secret || provided === secret;
   if (secret && !authValid) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
