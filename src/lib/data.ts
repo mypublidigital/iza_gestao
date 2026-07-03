@@ -5,11 +5,7 @@
 
 import { conversations as MOCK, rawEvents as MOCK_RAW } from "@/lib/mock/data";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
-import {
-  dbCountConversations,
-  dbLoadConversation,
-  dbLoadConversations,
-} from "@/lib/data-supabase";
+import { dbLoadConversation, dbLoadConversations } from "@/lib/data-supabase";
 import type {
   AssuntoDist,
   CanalDist,
@@ -29,9 +25,9 @@ import type {
 // ---------------- Fonte de dados ----------------
 
 async function hasRealData(): Promise<boolean> {
-  // Sem cache entre requests: o resultado muda assim que o banco é populado (seed/Chatvolt).
-  if (!isSupabaseConfigured()) return false;
-  return (await dbCountConversations()) > 0;
+  // Em produção (Supabase configurado) usamos SEMPRE dados reais — mesmo vazios (estado limpo).
+  // O mock só aparece quando não há Supabase (repo clonado sem credenciais / dev local).
+  return isSupabaseConfigured();
 }
 
 export function filterConversations(list: Conversation[], f: DashboardFilters = {}): Conversation[] {
