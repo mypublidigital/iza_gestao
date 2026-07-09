@@ -10,6 +10,7 @@ import {
   Radio,
   Plane,
   LogOut,
+  Users,
 } from "lucide-react";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
 
@@ -20,6 +21,7 @@ const NAV = [
 ];
 
 const NAV_ADMIN = [
+  { href: "/usuarios", label: "Usuários", icon: Users },
   { href: "/eventos", label: "Integração & Testes", icon: Radio },
 ];
 
