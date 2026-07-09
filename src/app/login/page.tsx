@@ -88,12 +88,9 @@ function LoginForm() {
           </button>
         </form>
 
-        <div className="mt-4 flex items-center justify-between text-xs">
+        <div className="mt-4 text-center text-xs">
           <Link href="/forgot-password" className="text-primary hover:underline">
             Esqueci minha senha
-          </Link>
-          <Link href="/signup" className="text-primary hover:underline">
-            Criar conta
           </Link>
         </div>
       </div>
