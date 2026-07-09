@@ -4,6 +4,7 @@
 // Acionado pelo Vercel Cron via /api/jobs/process. NÃO chama o Claude (isso é a Fase 4).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeStatus } from "@/lib/status";
 
 interface RawRow {
   id: string;
@@ -47,7 +48,7 @@ function buildConversationUpsert(p: Record<string, unknown>, conversationId: str
   set("agent_id", str(p.agentId));
   set("agent_name", str(p.agentName));
   set("channel", str(p.channel));
-  set("status", str(p.conversationStatus));
+  conv.status = normalizeStatus(str(p.conversationStatus));
   set("priority", str(p.conversationPriority));
   if (typeof p.isAiEnabled === "boolean") conv.is_ai_enabled = p.isAiEnabled;
   set("user_name", str(p.userName));

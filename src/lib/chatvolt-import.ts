@@ -4,6 +4,7 @@
 // Roda em lotes (resumível via cursor) e marca enriched_at=null para o Cron classificar depois.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeStatus } from "@/lib/status";
 
 const BASE = "https://app.chatvolt.ai";
 
@@ -17,12 +18,6 @@ async function cvGet(path: string): Promise<any> {
   return res.json();
 }
 
-function mapStatus(s?: string): string {
-  if (s === "RESOLVED") return "resolvida";
-  if (s === "HUMAN_REQUESTED" || s === "ASSIGNED") return "transferida";
-  return "aberta";
-}
-
 async function importConversation(sb: SupabaseClient, conv: any, contact: any): Promise<void> {
   const id = conv.id as string;
   const nome = [contact?.firstName, contact?.lastName].filter(Boolean).join(" ") || undefined;
@@ -33,7 +28,7 @@ async function importConversation(sb: SupabaseClient, conv: any, contact: any): 
       conversation_id: id,
       organization_id: contact?.organizationId ?? conv?.organizationId ?? "org_isatravel",
       channel: conv.channel ?? null,
-      status: mapStatus(conv.status),
+      status: normalizeStatus(conv.status),
       is_ai_enabled: conv.isAiEnabled ?? true,
       user_name: nome,
       user_phone: contact?.phoneNumber ?? undefined,

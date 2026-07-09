@@ -90,7 +90,7 @@ export default async function ConversasPage({
                   </td>
                   <td className="px-4 py-3 text-muted">{CANAL_LABEL[c.channel]}</td>
                   <td className="px-4 py-3">
-                    <Badge tone={STATUS_TONE[c.status]}>{c.status}</Badge>
+                    <Badge tone={STATUS_TONE[c.status] ?? "slate"}>{c.status}</Badge>
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={SENT_TONE[c.sentimento]}>{SENTIMENTO_LABEL[c.sentimento]}</Badge>
