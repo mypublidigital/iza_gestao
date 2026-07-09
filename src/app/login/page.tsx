@@ -1,10 +1,14 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LogIn } from "lucide-react";
-import { createSupabaseBrowser } from "@/lib/supabase/browser";
 import Logo from "@/components/Logo";
+import Turnstile from "@/components/Turnstile";
+
+const inputCls =
+  "w-full rounded-lg border bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30";
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +17,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [captcha, setCaptcha] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -20,19 +25,20 @@ function LoginForm() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const supabase = createSupabaseBrowser();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError("E-mail ou senha inválidos.");
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, captchaToken: captcha }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error === "captcha" ? "Confirme o captcha." : "E-mail ou senha inválidos.");
       setLoading(false);
       return;
     }
     router.push(next);
     router.refresh();
   }
-
-  const inputCls =
-    "w-full rounded-lg border bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -68,6 +74,8 @@ function LoginForm() {
             />
           </label>
 
+          <Turnstile onToken={setCaptcha} />
+
           {error && <p className="text-sm text-negativo">{error}</p>}
 
           <button
@@ -80,9 +88,14 @@ function LoginForm() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-muted">
-          Acesso restrito à equipe da Iza Travel. Novos usuários são criados por um administrador.
-        </p>
+        <div className="mt-4 flex items-center justify-between text-xs">
+          <Link href="/forgot-password" className="text-primary hover:underline">
+            Esqueci minha senha
+          </Link>
+          <Link href="/signup" className="text-primary hover:underline">
+            Criar conta
+          </Link>
+        </div>
       </div>
     </div>
   );
