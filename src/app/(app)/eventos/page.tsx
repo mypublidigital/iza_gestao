@@ -3,6 +3,7 @@ import { Badge, Card, PageHeader } from "@/components/ui";
 import EventSimulator from "@/components/EventSimulator";
 import ProcessButton from "@/components/ProcessButton";
 import SeedButton from "@/components/SeedButton";
+import ImportButton from "@/components/ImportButton";
 import { getRecentIngested } from "@/lib/ingest-store";
 import { loadRawEvents } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/supabase/server";
@@ -77,6 +78,20 @@ export default async function EventosPage() {
               Conversas passam a exibir dados reais. Pode rodar mais de uma vez.
             </p>
             <SeedButton />
+          </Card>
+        )}
+
+        {online && (
+          <Card
+            title="Importar histórico do Chatvolt"
+            hint="puxa as conversas antigas pela API do Chatvolt"
+          >
+            <p className="mb-3 text-sm text-muted">
+              Importa as conversas anteriores (a última conversa de cada contato) direto da API do
+              Chatvolt e passa pelo pipeline (classificação pela IA acontece aos poucos, via Cron).
+              Roda em lotes — pode parar e retomar. São muitos contatos, então pode levar um tempo.
+            </p>
+            <ImportButton />
           </Card>
         )}
 
