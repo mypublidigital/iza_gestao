@@ -2,8 +2,9 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plane, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { createSupabaseBrowser } from "@/lib/supabase/browser";
+import Logo from "@/components/Logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -36,14 +37,8 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm rounded-2xl border bg-surface p-8 shadow-sm">
-        <div className="mb-6 flex items-center gap-2">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
-            <Plane size={20} />
-          </span>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-foreground">Iza Travel</p>
-            <p className="text-xs text-muted">Inteligência Conversacional</p>
-          </div>
+        <div className="mb-6 flex justify-center">
+          <Logo height={52} />
         </div>
 
         <h1 className="text-lg font-semibold text-foreground">Acesso da equipe</h1>

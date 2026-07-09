@@ -1,29 +1,31 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f8fb;
+  /* Paleta oficial Iza Travel */
+  --background: #f4f8fb;
   --surface: #ffffff;
-  --surface-2: #f1f5f9;
-  --foreground: #0f172a;
-  --muted: #64748b;
-  --border: #e2e8f0;
+  --surface-2: #eaf2f8;
+  --foreground: #10243a; /* azul marinho escuro */
+  --muted: #5b7183;
+  --border: #d8e6f0;
 
-  --primary: #0d9488; /* teal 600 — "ocean" */
-  --primary-strong: #0f766e;
-  --primary-soft: #ccfbf1;
-  --accent: #f97316; /* coral/laranja */
-  --accent-soft: #ffedd5;
+  --primary: #006ebb; /* azul Travel */
+  --primary-strong: #003052; /* azul marinho base */
+  --primary-soft: #d6ebf9;
+  --accent: #00b7f6; /* azul céu */
+  --accent-soft: #d9f4fe;
 
   --positivo: #16a34a;
   --neutro: #f59e0b;
   --negativo: #dc2626;
 
-  --chart-1: #0d9488;
-  --chart-2: #6366f1;
-  --chart-3: #f97316;
-  --chart-4: #ec4899;
-  --chart-5: #0ea5e9;
-  --chart-6: #84cc16;
+  /* Gráficos: paleta da marca (Travel + Corporate) */
+  --chart-1: #006ebb;
+  --chart-2: #00b7f6;
+  --chart-3: #009ba1;
+  --chart-4: #bcd979;
+  --chart-5: #003052;
+  --chart-6: #798487;
 }
 
 @theme inline {
@@ -55,12 +57,11 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* scrollbar discreta */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #b9cde0;
   border-radius: 999px;
 }
