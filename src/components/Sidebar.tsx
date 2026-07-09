@@ -39,7 +39,7 @@ export default function Sidebar({ userEmail }: { userEmail?: string | null }) {
           <Plane size={20} />
         </span>
         <span className="leading-tight">
-          <span className="block text-sm font-semibold text-foreground">ISA Travel</span>
+          <span className="block text-sm font-semibold text-foreground">Iza Travel</span>
           <span className="block text-xs text-muted">Inteligência Conversacional</span>
         </span>
       </Link>

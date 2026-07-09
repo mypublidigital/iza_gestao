@@ -12,5 +12,7 @@ export function getAnthropic(): Anthropic | null {
   return cached;
 }
 
-export const ENRICH_MODEL = process.env.ANTHROPIC_MODEL_ENRICH ?? "claude-haiku-4-5";
+// Enriquecimento usa Sonnet: mais confiável que o Haiku no tool use (o Haiku vazava
+// a sintaxe interna da ferramenta no destino) e classifica melhor destino/assunto.
+export const ENRICH_MODEL = "claude-sonnet-4-6";
 export const AGENT_MODEL = process.env.ANTHROPIC_MODEL_AGENT ?? "claude-sonnet-4-6";

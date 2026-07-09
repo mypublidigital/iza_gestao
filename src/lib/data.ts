@@ -63,6 +63,10 @@ export function collectTags(list: Conversation[]): string[] {
   return Array.from(new Set(list.flatMap((c) => c.tags))).sort();
 }
 
+export function collectChannels(list: Conversation[]): string[] {
+  return Array.from(new Set(list.map((c) => c.channel))).filter(Boolean).sort();
+}
+
 // ---------------- Agregações do dashboard (puras) ----------------
 
 export function getKpis(list: Conversation[]): KpiSummary {

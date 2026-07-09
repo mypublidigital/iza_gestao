@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge, PageHeader } from "@/components/ui";
 import FilterBar from "@/components/FilterBar";
 import SearchInput from "@/components/SearchInput";
-import { collectTags, filterConversations, loadConversations } from "@/lib/data";
+import { collectChannels, collectTags, filterConversations, loadConversations } from "@/lib/data";
 import { parseFilters } from "@/lib/filters";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,14 @@ const SENT_TONE: Record<Sentimento, "positivo" | "neutro" | "negativo"> = {
 export default async function ConversasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; canal?: string; tag?: string; q?: string }>;
+  searchParams: Promise<{
+    periodo?: string;
+    canal?: string;
+    tag?: string;
+    q?: string;
+    de?: string;
+    ate?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const f = parseFilters(sp);
@@ -52,7 +59,7 @@ export default async function ConversasPage({
       />
 
       <div className="space-y-4 p-8">
-        <FilterBar tags={collectTags(all)} />
+        <FilterBar tags={collectTags(all)} channels={collectChannels(all)} />
 
         <div className="overflow-hidden rounded-2xl border bg-surface shadow-sm">
           <table className="w-full text-sm">

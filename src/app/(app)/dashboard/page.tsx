@@ -12,6 +12,7 @@ import {
   VolumeLine,
 } from "@/components/charts";
 import {
+  collectChannels,
   collectTags,
   filterConversations,
   getAssuntos,
@@ -34,7 +35,13 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodo?: string; canal?: string; tag?: string }>;
+  searchParams: Promise<{
+    periodo?: string;
+    canal?: string;
+    tag?: string;
+    de?: string;
+    ate?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const f = parseFilters(sp);
@@ -58,7 +65,7 @@ export default async function DashboardPage({
       <PageHeader
         title="Dashboard"
         subtitle="Indicadores de atendimento do agente de IA no WhatsApp"
-        actions={<FilterBar tags={collectTags(all)} />}
+        actions={<FilterBar tags={collectTags(all)} channels={collectChannels(all)} />}
       />
 
       <div className="space-y-6 p-8">

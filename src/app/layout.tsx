@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ISA Travel — Inteligência Conversacional",
+  title: "Iza Travel — Inteligência Conversacional",
   description:
-    "Plataforma de gestão e análise das conversas do agente de IA da ISA Travel no WhatsApp.",
+    "Plataforma de gestão e análise das conversas do agente de IA da Iza Travel no WhatsApp.",
 };
 
 export default function RootLayout({

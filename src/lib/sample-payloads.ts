@@ -16,7 +16,7 @@ const SAMPLE_TS = "2026-06-19T12:00:00.000Z";
 const base = {
   conversationId: "conv_sim_001",
   agentId: "agt_isa",
-  agentName: "ISA (IA)",
+  agentName: "Iza (IA)",
   channel: "whatsapp",
   conversationStatus: "aberta",
   conversationPriority: "media",
@@ -77,7 +77,7 @@ export const SAMPLE_PAYLOADS: SamplePayload[] = [
       isAiEnabled: false,
       agentName: "Lia (humano)",
       messageId: "wamid_sim_003",
-      agentResponse: "Olá, sou a Lia da ISA Travel. Vou te ajudar com a alteração da sua reserva.",
+      agentResponse: "Olá, sou a Lia da Iza Travel. Vou te ajudar com a alteração da sua reserva.",
       createdAt: SAMPLE_TS,
     },
   },

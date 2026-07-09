@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CANAL_LABEL } from "@/lib/format";
+import { canalLabel } from "@/lib/format";
 
 const PERIODOS = [
   { value: "7", label: "7 dias" },
@@ -9,7 +9,13 @@ const PERIODOS = [
   { value: "60", label: "60 dias" },
 ];
 
-export default function FilterBar({ tags }: { tags: string[] }) {
+export default function FilterBar({
+  tags,
+  channels,
+}: {
+  tags: string[];
+  channels: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -17,26 +23,34 @@ export default function FilterBar({ tags }: { tags: string[] }) {
   const periodo = params.get("periodo") ?? "30";
   const canal = params.get("canal") ?? "todos";
   const tag = params.get("tag") ?? "todas";
+  const de = params.get("de") ?? "";
+  const ate = params.get("ate") ?? "";
+  const rangeAtivo = Boolean(de);
 
-  function update(key: string, value: string) {
+  function update(changes: Record<string, string | null>) {
     const next = new URLSearchParams(params.toString());
-    if (value === "todos" || value === "todas") next.delete(key);
-    else next.set(key, value);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === null || value === "" || value === "todos" || value === "todas") next.delete(key);
+      else next.set(key, value);
+    }
     router.push(`${pathname}?${next.toString()}`);
   }
 
   const selectCls =
     "rounded-lg border bg-surface px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30";
+  const dateCls =
+    "rounded-lg border bg-surface px-2 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30";
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* Período rápido (desativado quando há intervalo de datas) */}
       <div className="flex rounded-lg border bg-surface p-0.5">
         {PERIODOS.map((p) => (
           <button
             key={p.value}
-            onClick={() => update("periodo", p.value)}
+            onClick={() => update({ periodo: p.value, de: null, ate: null })}
             className={`rounded-md px-3 py-1 text-sm font-medium transition ${
-              periodo === p.value
+              periodo === p.value && !rangeAtivo
                 ? "bg-primary text-white"
                 : "text-muted hover:text-foreground"
             }`}
@@ -46,16 +60,49 @@ export default function FilterBar({ tags }: { tags: string[] }) {
         ))}
       </div>
 
-      <select value={canal} onChange={(e) => update("canal", e.target.value)} className={selectCls}>
+      {/* Intervalo de datas */}
+      <div className="flex items-center gap-1 rounded-lg border bg-surface px-2 py-1">
+        <span className="text-xs text-muted">De</span>
+        <input
+          type="date"
+          value={de}
+          max={ate || undefined}
+          onChange={(e) => update({ de: e.target.value, ate })}
+          className={dateCls}
+        />
+        <span className="text-xs text-muted">até</span>
+        <input
+          type="date"
+          value={ate}
+          min={de || undefined}
+          onChange={(e) => update({ ate: e.target.value, de: de || e.target.value })}
+          className={dateCls}
+        />
+        {rangeAtivo && (
+          <button
+            onClick={() => update({ de: null, ate: null })}
+            className="ml-1 text-xs font-medium text-muted hover:text-foreground"
+            title="Limpar intervalo"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <select
+        value={canal}
+        onChange={(e) => update({ canal: e.target.value })}
+        className={selectCls}
+      >
         <option value="todos">Todos os canais</option>
-        {Object.entries(CANAL_LABEL).map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
+        {channels.map((c) => (
+          <option key={c} value={c}>
+            {canalLabel(c)}
           </option>
         ))}
       </select>
 
-      <select value={tag} onChange={(e) => update("tag", e.target.value)} className={selectCls}>
+      <select value={tag} onChange={(e) => update({ tag: e.target.value })} className={selectCls}>
         <option value="todas">Todas as tags</option>
         {tags.map((t) => (
           <option key={t} value={t}>

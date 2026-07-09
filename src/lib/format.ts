@@ -27,7 +27,13 @@ export const CANAL_LABEL: Record<Canal, string> = {
   instagram: "Instagram",
   webchat: "Webchat",
   telegram: "Telegram",
+  zapi: "WhatsApp (Z-API)",
 };
+
+/** Rótulo amigável do canal, com fallback para o valor cru (canais novos do Chatvolt). */
+export function canalLabel(c: string): string {
+  return CANAL_LABEL[c as Canal] ?? c;
+}
 
 export const SENTIMENTO_LABEL: Record<Sentimento, string> = {
   positivo: "Positivo",

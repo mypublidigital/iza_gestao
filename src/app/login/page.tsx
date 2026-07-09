@@ -41,7 +41,7 @@ function LoginForm() {
             <Plane size={20} />
           </span>
           <div className="leading-tight">
-            <p className="text-sm font-semibold text-foreground">ISA Travel</p>
+            <p className="text-sm font-semibold text-foreground">Iza Travel</p>
             <p className="text-xs text-muted">Inteligência Conversacional</p>
           </div>
         </div>
@@ -86,7 +86,7 @@ function LoginForm() {
         </form>
 
         <p className="mt-4 text-center text-xs text-muted">
-          Acesso restrito à equipe da ISA Travel. Novos usuários são criados por um administrador.
+          Acesso restrito à equipe da Iza Travel. Novos usuários são criados por um administrador.
         </p>
       </div>
     </div>

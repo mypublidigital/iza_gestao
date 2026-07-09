@@ -21,7 +21,7 @@ export interface ChatTurn {
   text: string;
 }
 
-const SYSTEM = `Você é o assistente de inteligência da ISA Travel, uma agência de turismo brasileira.
+const SYSTEM = `Você é o assistente de inteligência da Iza Travel, uma agência de turismo brasileira.
 Responda perguntas da equipe sobre as conversas que o agente de IA teve com clientes no WhatsApp.
 
 Você tem duas ferramentas:

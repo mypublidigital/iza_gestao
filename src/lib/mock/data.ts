@@ -61,8 +61,8 @@ const ASSUNTOS = [
 const CANAIS: Canal[] = ["whatsapp", "whatsapp", "whatsapp", "instagram", "webchat", "telegram"];
 
 const AGENTES = [
-  { id: "agt_isa", name: "ISA (IA)" },
-  { id: "agt_isa", name: "ISA (IA)" },
+  { id: "agt_isa", name: "Iza (IA)" },
+  { id: "agt_isa", name: "Iza (IA)" },
   { id: "agt_lia", name: "Lia (humano)" },
 ];
 

@@ -1,45 +1,38 @@
-// Enriquecimento (Fase 4) — classifica cada conversa com Claude Haiku via tool use estruturado.
-// Usa strict tool use (strict:true + tool_choice forçado) para garantir JSON válido no schema.
+// Enriquecimento — classifica cada conversa com Claude (Sonnet) via tool use estruturado.
 // Preenche em `conversations`: destino_principal, destinos, assunto, resolvida, sentimento, intencao_compra.
+//
+// Robustez: sanitiza a saída (o modelo pode, raramente, vazar marcação) e o "assunto" é texto livre
+// e específico (para desagrupar o genérico "Outro" e mostrar o motivo real do contato).
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAnthropic, ENRICH_MODEL } from "@/lib/anthropic";
 
-const ASSUNTOS = [
-  "Cotação de pacote",
-  "Dúvida sobre documentação/visto",
-  "Reclamação",
-  "Pós-venda",
-  "Alteração de reserva",
-  "Informação de preço",
-  "Seguro viagem",
-  "Disponibilidade de datas",
-  "Outro",
-] as const;
-
 const TOOL: Anthropic.Tool = {
   name: "classificar_conversa",
-  description:
-    "Registra a classificação de uma conversa de atendimento de uma agência de turismo.",
-  strict: true,
+  description: "Registra a classificação de uma conversa de atendimento de uma agência de turismo.",
   input_schema: {
     type: "object",
     additionalProperties: false,
     properties: {
       destino_principal: {
         type: "string",
-        description: 'Principal destino de viagem mencionado (ex.: "Maldivas", "Disney/Orlando"). "" se nenhum.',
+        description:
+          'Principal destino de viagem mencionado (cidade/região/país, ex.: "Buenos Aires", "Porto de Galinhas", "Disney/Orlando"). Use "" (vazio) se nenhum destino for mencionado. NUNCA escreva marcação ou colchetes.',
       },
       destinos: {
         type: "array",
         items: { type: "string" },
-        description: "Todos os destinos mencionados (pode ser vazio).",
+        description: "Todos os destinos citados (lista vazia se nenhum).",
       },
       assunto: {
         type: "string",
-        enum: ASSUNTOS as unknown as string[],
-        description: "Assunto/intenção principal da conversa.",
+        description:
+          'Motivo específico do contato, em português, curto (2 a 5 palavras, em Maiúsculas Iniciais). ' +
+          'Seja específico — evite o genérico "Outro". Exemplos: "Cotação de pacote", "Reclamação de hotel", ' +
+          '"Dúvida sobre visto", "Alteração de reserva", "Formas de pagamento", "Seguro viagem", ' +
+          '"Disponibilidade de datas", "Pós-venda", "Roteiro e passeios", "Saudação inicial". ' +
+          'Se realmente não der para inferir, use "Contato sem intenção clara".',
       },
       resolvida: {
         type: "string",
@@ -57,14 +50,7 @@ const TOOL: Anthropic.Tool = {
         description: "Sinais de intenção de compra/fechamento.",
       },
     },
-    required: [
-      "destino_principal",
-      "destinos",
-      "assunto",
-      "resolvida",
-      "sentimento",
-      "intencao_compra",
-    ],
+    required: ["destino_principal", "destinos", "assunto", "resolvida", "sentimento", "intencao_compra"],
   },
 };
 
@@ -77,17 +63,25 @@ interface Classificacao {
   intencao_compra: "alta" | "media" | "baixa" | "nenhuma";
 }
 
+// Rejeita valores com marcação/vazamento e limita tamanho.
+function cleanStr(v: unknown, maxLen = 60): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  if (/[<>]|parameter\s*name|antml/i.test(s)) return null;
+  if (s.length > maxLen) return null;
+  return s;
+}
+
 const SYSTEM =
   "Você classifica conversas de atendimento de uma agência de turismo brasileira (cliente × agente de IA no WhatsApp). " +
-  "Analise a transcrição e chame a ferramenta classificar_conversa com a classificação. Responda em português.";
+  "Analise TODA a transcrição (mensagens do cliente e do agente) e chame a ferramenta classificar_conversa. " +
+  "Seja específico no assunto para revelar o motivo real do contato. Responda apenas via a ferramenta.";
 
-async function classificar(
-  anthropic: Anthropic,
-  transcript: string,
-): Promise<Classificacao | null> {
+async function classificar(anthropic: Anthropic, transcript: string): Promise<Classificacao | null> {
   const msg = await anthropic.messages.create({
     model: ENRICH_MODEL,
-    max_tokens: 512,
+    max_tokens: 1024,
     system: SYSTEM,
     tools: [TOOL],
     tool_choice: { type: "tool", name: "classificar_conversa" },
@@ -103,11 +97,10 @@ export interface EnrichResult {
   errors: number;
 }
 
-/** Enriquece conversas ainda não classificadas (enriched_at IS NULL) que tenham mensagens. */
-export async function enrichPending(
-  sb: SupabaseClient,
-  batchSize = 5,
-): Promise<EnrichResult> {
+/** Enriquece conversas ainda não classificadas (enriched_at IS NULL) que tenham mensagens.
+ *  O processador zera enriched_at quando chegam mensagens novas, então isto também re-enriquece
+ *  conversas que cresceram — mantendo a classificação sempre atualizada. */
+export async function enrichPending(sb: SupabaseClient, batchSize = 8): Promise<EnrichResult> {
   const anthropic = getAnthropic();
   if (!anthropic) return { enriched: 0, errors: 0 };
 
@@ -130,7 +123,8 @@ export async function enrichPending(
         .from("messages")
         .select("role,content,created_at")
         .eq("conversation_id", conversation_id)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .limit(60);
 
       const transcript = (msgs ?? [])
         .map((m) => `${m.role === "user" ? "Cliente" : "Agente"}: ${m.content}`)
@@ -146,9 +140,11 @@ export async function enrichPending(
       await sb
         .from("conversations")
         .update({
-          destino_principal: c.destino_principal?.trim() || null,
-          destinos: (c.destinos ?? []).filter((d) => d?.trim()),
-          assunto: c.assunto,
+          destino_principal: cleanStr(c.destino_principal),
+          destinos: (Array.isArray(c.destinos) ? c.destinos : [])
+            .map((d) => cleanStr(d))
+            .filter((d): d is string => Boolean(d)),
+          assunto: cleanStr(c.assunto) ?? "Contato sem intenção clara",
           resolvida: c.resolvida,
           sentimento: c.sentimento,
           intencao_compra: c.intencao_compra,

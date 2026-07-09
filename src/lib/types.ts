@@ -13,7 +13,7 @@ export type EventType =
   | "STEP_ENTERED"
   | "NPS_INTERACTION";
 
-export type Canal = "whatsapp" | "instagram" | "webchat" | "telegram";
+export type Canal = "whatsapp" | "instagram" | "webchat" | "telegram" | "zapi";
 
 export type ConversationStatus = "aberta" | "resolvida" | "pendente" | "transferida";
 

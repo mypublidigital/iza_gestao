@@ -182,6 +182,8 @@ export async function processRawEvents(
         message_count: list.length,
         first_message_at: list[0]?.created_at ?? null,
         last_message_at: list[list.length - 1]?.created_at ?? null,
+        // Chegou conteúdo novo → re-enriquecer (a classificação acompanha o crescimento da conversa).
+        enriched_at: null,
       })
       .eq("conversation_id", id);
   }
