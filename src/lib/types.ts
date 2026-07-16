@@ -89,6 +89,7 @@ export interface Conversation {
   enrichedAt?: string;
 
   tags: string[];
+  atendentes: string[]; // membros do Chatvolt que atenderam (assignees + quem respondeu)
 
   // Mensagens da conversa (no banco vivem em `messages`)
   messages: Message[];
@@ -115,6 +116,7 @@ export interface DashboardFilters {
   to?: string; // ISO date
   channel?: Canal | "todos";
   tag?: string | "todas";
+  atendente?: string | "todos";
 }
 
 export interface KpiSummary {

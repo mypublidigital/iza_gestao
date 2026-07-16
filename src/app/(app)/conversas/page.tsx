@@ -2,7 +2,13 @@ import Link from "next/link";
 import { Badge, PageHeader } from "@/components/ui";
 import FilterBar from "@/components/FilterBar";
 import SearchInput from "@/components/SearchInput";
-import { collectChannels, collectTags, filterConversations, loadConversations } from "@/lib/data";
+import {
+  collectAtendentes,
+  collectChannels,
+  collectTags,
+  filterConversations,
+  loadConversations,
+} from "@/lib/data";
 import { parseFilters } from "@/lib/filters";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +37,7 @@ export default async function ConversasPage({
     q?: string;
     de?: string;
     ate?: string;
+    atendente?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -59,7 +66,11 @@ export default async function ConversasPage({
       />
 
       <div className="space-y-4 p-8">
-        <FilterBar tags={collectTags(all)} channels={collectChannels(all)} />
+        <FilterBar
+          tags={collectTags(all)}
+          channels={collectChannels(all)}
+          atendentes={collectAtendentes(all)}
+        />
 
         <div className="overflow-hidden rounded-2xl border bg-surface shadow-sm">
           <table className="w-full text-sm">

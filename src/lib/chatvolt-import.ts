@@ -18,7 +18,42 @@ async function cvGet(path: string): Promise<any> {
   return res.json();
 }
 
-async function importConversation(sb: SupabaseClient, conv: any, contact: any): Promise<void> {
+// Mapa userId → nome dos membros (atendentes) do Chatvolt.
+let membersCache: Record<string, string> | null = null;
+async function membersMap(): Promise<Record<string, string>> {
+  if (membersCache) return membersCache;
+  const map: Record<string, string> = {};
+  try {
+    const list = await cvGet("/api/memberships");
+    for (const m of Array.isArray(list) ? list : []) {
+      if (m?.user?.id && m?.user?.name) map[m.user.id] = m.user.name;
+    }
+  } catch {
+    // segue sem o mapa (usa só os nomes dos assignees)
+  }
+  membersCache = map;
+  return map;
+}
+
+// Atendentes da conversa: assignees + membros que enviaram mensagens.
+function extractAtendentes(conv: any, members: Record<string, string>): string[] {
+  const names = new Set<string>();
+  for (const a of Array.isArray(conv.assignees) ? conv.assignees : []) {
+    const n = a?.user?.name ?? (a?.user?.id ? members[a.user.id] : null);
+    if (n) names.add(n);
+  }
+  for (const m of Array.isArray(conv.messages) ? conv.messages : []) {
+    if (m?.userId && members[m.userId]) names.add(members[m.userId]);
+  }
+  return [...names];
+}
+
+async function importConversation(
+  sb: SupabaseClient,
+  conv: any,
+  contact: any,
+  members: Record<string, string>,
+): Promise<void> {
   const id = conv.id as string;
   const nome = [contact?.firstName, contact?.lastName].filter(Boolean).join(" ") || undefined;
 
@@ -34,6 +69,7 @@ async function importConversation(sb: SupabaseClient, conv: any, contact: any): 
       user_phone: contact?.phoneNumber ?? undefined,
       user_email: contact?.email ?? undefined,
       frustration: typeof conv.frustration === "number" ? conv.frustration : null,
+      atendentes: extractAtendentes(conv, members),
       enriched_at: null, // será classificada pelo Cron
     },
     { onConflict: "conversation_id" },
@@ -90,6 +126,7 @@ export async function importChatvoltBatch(
 ): Promise<ImportResult> {
   if (!process.env.CHATVOLT_API_KEY) throw new Error("CHATVOLT_API_KEY não configurada");
 
+  const members = await membersMap();
   const params = new URLSearchParams({ limit: String(pageSize) });
   if (cursor) params.set("cursor", cursor);
   const page = await cvGet(`/api/contacts?${params.toString()}`);
@@ -104,7 +141,7 @@ export async function importChatvoltBatch(
     }
     try {
       const conv = await cvGet(`/api/conversations/${convId}`);
-      await importConversation(sb, conv, contact);
+      await importConversation(sb, conv, contact, members);
       imported++;
     } catch (e) {
       console.error("[import] conversa", convId, e);

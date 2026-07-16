@@ -275,6 +275,7 @@ function gerarConversa(i: number): Conversation {
     intencaoCompra: intencaoPorAssunto(assunto),
     enrichedAt: new Date(new Date(lastAt).getTime() + 120 * 1000).toISOString(),
     tags,
+    atendentes: chance(0.6) ? [pick(["Paulinha", "Juliana Parra", "Dany Amaral"])] : [],
     messages,
     nps,
   };

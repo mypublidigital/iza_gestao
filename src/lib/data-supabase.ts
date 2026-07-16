@@ -130,6 +130,7 @@ function mapRow(r: any, messages: Message[] = []): Conversation {
     intencaoCompra: (r.intencao_compra as IntencaoCompra) ?? "nenhuma",
     enrichedAt: r.enriched_at ?? undefined,
     tags,
+    atendentes: Array.isArray(r.atendentes) ? r.atendentes : [],
     messages,
     nps: nps
       ? {

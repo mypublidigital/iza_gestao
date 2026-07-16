@@ -12,9 +12,11 @@ const PERIODOS = [
 export default function FilterBar({
   tags,
   channels,
+  atendentes = [],
 }: {
   tags: string[];
   channels: string[];
+  atendentes?: string[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -23,6 +25,7 @@ export default function FilterBar({
   const periodo = params.get("periodo") ?? "30";
   const canal = params.get("canal") ?? "todos";
   const tag = params.get("tag") ?? "todas";
+  const atendente = params.get("atendente") ?? "todos";
   const de = params.get("de") ?? "";
   const ate = params.get("ate") ?? "";
   const rangeAtivo = Boolean(de);
@@ -110,6 +113,21 @@ export default function FilterBar({
           </option>
         ))}
       </select>
+
+      {atendentes.length > 0 && (
+        <select
+          value={atendente}
+          onChange={(e) => update({ atendente: e.target.value })}
+          className={selectCls}
+        >
+          <option value="todos">Todos os atendentes</option>
+          {atendentes.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      )}
     </div>
   );
 }

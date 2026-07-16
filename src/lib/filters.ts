@@ -6,6 +6,7 @@ export interface RawParams {
   tag?: string;
   de?: string; // YYYY-MM-DD (data inicial)
   ate?: string; // YYYY-MM-DD (data final)
+  atendente?: string;
 }
 
 /** Converte os search params da URL em DashboardFilters.
@@ -30,5 +31,6 @@ export function parseFilters(p: RawParams): DashboardFilters {
     to,
     channel: (p.canal as Canal) ?? "todos",
     tag: p.tag ?? "todas",
+    atendente: p.atendente ?? "todos",
   };
 }

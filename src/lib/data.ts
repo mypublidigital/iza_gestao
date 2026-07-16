@@ -37,6 +37,7 @@ export function filterConversations(list: Conversation[], f: DashboardFilters = 
     if (f.to && t > +new Date(f.to)) return false;
     if (f.channel && f.channel !== "todos" && c.channel !== f.channel) return false;
     if (f.tag && f.tag !== "todas" && !c.tags.includes(f.tag)) return false;
+    if (f.atendente && f.atendente !== "todos" && !c.atendentes.includes(f.atendente)) return false;
     return true;
   });
 }
@@ -65,6 +66,10 @@ export function collectTags(list: Conversation[]): string[] {
 
 export function collectChannels(list: Conversation[]): string[] {
   return Array.from(new Set(list.map((c) => c.channel))).filter(Boolean).sort();
+}
+
+export function collectAtendentes(list: Conversation[]): string[] {
+  return Array.from(new Set(list.flatMap((c) => c.atendentes))).filter(Boolean).sort();
 }
 
 // ---------------- Agregações do dashboard (puras) ----------------
