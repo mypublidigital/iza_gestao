@@ -32,16 +32,37 @@ Esquema (Postgres):
 - conversations(conversation_id text, channel text, status text, is_ai_enabled bool, user_name text,
     first_message_at timestamptz, last_message_at timestamptz, message_count int, frustration numeric,
     summary text, destino_principal text, destinos text[], assunto text, resolvida enum('sim','nao','parcial'),
-    sentimento enum('positivo','neutro','negativo'), intencao_compra text, ctwa_headline text)
+    sentimento enum('positivo','neutro','negativo'), intencao_compra text, ctwa_headline text,
+    atendentes text[])  -- nomes dos ATENDENTES HUMANOS (usuários do Chatvolt) que atenderam a conversa
 - messages(conversation_id text, role enum('user','agent'), content text, created_at timestamptz)
 - nps_ratings(conversation_id text, rating int, comment text, completed_at timestamptz)
+
+Atendentes (humanos): a coluna conversations.atendentes é um text[] com os nomes de quem atendeu
+(ex.: 'Paulinha', 'Juliana Parra'). Array vazio = conversa atendida só pela IA.
+- Filtrar por atendente: WHERE 'Paulinha' = ANY(atendentes)  (compare nomes com ILIKE via EXISTS se necessário)
+- Contar por atendente: SELECT unnest(atendentes) AS atendente, count(*) FROM conversations GROUP BY 1 ORDER BY 2 DESC
+
+Datas e períodos (a coluna de referência é last_message_at; use timezone 'America/Sao_Paulo'):
+- Últimos N dias: WHERE last_message_at >= now() - interval '7 days'
+- Um mês específico: WHERE date_trunc('month', last_message_at AT TIME ZONE 'America/Sao_Paulo') = date '2026-06-01'
+- Por mês: SELECT to_char(last_message_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') AS mes, count(*) ... GROUP BY 1 ORDER BY 1
+- Exemplo combinado — atendimentos por atendente em julho/2026:
+  SELECT unnest(atendentes) AS atendente, count(*) AS total FROM conversations
+  WHERE last_message_at >= date '2026-07-01' AND last_message_at < date '2026-08-01'
+  GROUP BY 1 ORDER BY 2 DESC;
 
 Regras:
 - Sempre inclua conversation_id quando fizer sentido, para poder citar as fontes.
 - Use ILIKE para texto; sempre use LIMIT em SELECTs que possam retornar muitas linhas.
-- Datas: use now() e intervalos (ex.: last_message_at >= now() - interval '7 days').
 - Responda em português, de forma objetiva. Cite os conversation_id que embasam a resposta.
-- Nunca invente dados: baseie-se apenas nos resultados das ferramentas.`;
+- Nunca invente dados: baseie-se apenas nos resultados das ferramentas.
+
+Formato da resposta (Markdown — a interface renderiza títulos, listas, tabelas e negrito):
+- NUNCA responda em um bloco único de texto corrido.
+- Comece com 1 frase direta respondendo à pergunta.
+- Use listas com marcadores para itens e **tabelas Markdown** para comparações e rankings (ex.: atendente × total).
+- Use **negrito** para números e nomes importantes; use títulos curtos (###) apenas quando a resposta tiver seções.
+- Feche com "Fontes:" citando os conversation_id relevantes (quando houver).`;
 
 const TOOLS: Anthropic.Tool[] = [
   {

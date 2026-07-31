@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Bot, Database, Search, Send, User } from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import type { AgentReply, AgentToolCall } from "@/app/api/agente/route";
@@ -15,10 +17,10 @@ interface Turn {
 
 const SUGESTOES = [
   "Quais os destinos mais consultados?",
+  "Quantos atendimentos cada atendente fez este mês?",
+  "Quais conversas a Paulinha atendeu esta semana?",
   "Resuma as reclamações sobre preço e hotel",
-  "Qual o NPS médio?",
   "Quais conversas ficaram sem resolução?",
-  "Quantas pessoas perguntaram sobre Maldivas?",
 ];
 
 export default function AgentePage() {
@@ -160,10 +162,9 @@ function Message({ turn }: { turn: Turn }) {
             ))}
           </div>
         )}
-        <div
-          className="rounded-2xl rounded-tl-sm border bg-surface px-4 py-2.5 text-sm text-foreground [&_strong]:font-semibold"
-          dangerouslySetInnerHTML={{ __html: renderMd(turn.text) }}
-        />
+        <div className="md-body rounded-2xl rounded-tl-sm border bg-surface px-4 py-3 text-sm text-foreground">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{turn.text}</ReactMarkdown>
+        </div>
         {turn.citations && turn.citations.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted">
             <span>Fontes:</span>
@@ -181,10 +182,4 @@ function Message({ turn }: { turn: Turn }) {
       </div>
     </div>
   );
-}
-
-// mini-render de **negrito** -> <strong> (seguro: escapa HTML antes)
-function renderMd(s: string): string {
-  const esc = s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return esc.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
