@@ -57,9 +57,21 @@ Regras:
 - Responda em português, de forma objetiva. Cite os conversation_id que embasam a resposta.
 - Nunca invente dados: baseie-se apenas nos resultados das ferramentas.
 
+Como pesquisar com eficiência (você tem poucas rodadas de ferramenta):
+- Nomes de pessoas raramente batem exatamente. Use a lista de atendentes conhecidos abaixo e
+  escolha o nome real mais próximo do que o usuário escreveu (ex.: "Danielly" → "Dany Amaral";
+  "Ju" → "Juliana Parra"). Na dúvida, use ILIKE: EXISTS (SELECT 1 FROM unnest(atendentes) a WHERE a ILIKE '%dany%').
+- NUNCA repita uma consulta que já retornou vazio ou deu erro: mude a abordagem (outro nome, outro filtro,
+  ou uma consulta exploratória como SELECT DISTINCT unnest(atendentes) FROM conversations).
+- Perguntas compostas: resolva uma parte por vez e, para a parte qualitativa, prefira buscar a
+  coluna summary das conversas relevantes em UMA consulta SQL em vez de várias buscas semânticas.
+- Se ainda faltar informação, responda com o que já descobriu e diga claramente o que não foi possível apurar.
+  Nunca termine sem responder.
+
 Formato da resposta (Markdown — a interface renderiza títulos, listas, tabelas e negrito):
 - NUNCA responda em um bloco único de texto corrido.
-- Comece com 1 frase direta respondendo à pergunta.
+- Comece com 1 frase direta respondendo à pergunta. Não escreva preâmbulos sobre o seu processo
+  ("Ótimo!", "Deixa eu analisar...", "Vou consultar..."): entregue direto o resultado.
 - Use listas com marcadores para itens e **tabelas Markdown** para comparações e rankings (ex.: atendente × total).
 - Use **negrito** para números e nomes importantes; use títulos curtos (###) apenas quando a resposta tiver seções.
 - Feche com "Fontes:" citando os conversation_id relevantes (quando houver).`;
@@ -151,6 +163,34 @@ export function canRunRealAgent(): boolean {
   return Boolean(getAnthropic() && getSupabaseAdmin());
 }
 
+/** Contexto dinâmico: data de hoje (São Paulo) e nomes reais dos atendentes.
+ *  Evita que o agente erre o ano em perguntas por mês e que procure nomes inexistentes. */
+async function buildSystem(sb: SupabaseClient): Promise<string> {
+  const hoje = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "full",
+  }).format(new Date());
+  const iso = new Date().toISOString().slice(0, 10);
+
+  let atendentes: string[] = [];
+  try {
+    const { data } = await sb.from("conversations").select("atendentes").limit(2000);
+    atendentes = [...new Set((data ?? []).flatMap((r) => r.atendentes ?? []))].filter(Boolean);
+  } catch {
+    // segue sem a lista
+  }
+
+  return (
+    `${SYSTEM}\n\n` +
+    `Contexto atual:\n` +
+    `- Hoje é ${hoje} (data ISO: ${iso}, fuso America/Sao_Paulo). Use isto para interpretar ` +
+    `"este mês", "julho", "últimos 30 dias" etc.\n` +
+    (atendentes.length
+      ? `- Atendentes humanos existentes (nomes EXATOS como estão no banco): ${atendentes.join(", ")}.\n`
+      : `- Ainda não há atendentes registrados nas conversas.\n`)
+  );
+}
+
 export async function runAgent(message: string, history: ChatTurn[] = []): Promise<AgentReply> {
   const anthropic = getAnthropic();
   const sb = getSupabaseAdmin();
@@ -166,12 +206,14 @@ export async function runAgent(message: string, history: ChatTurn[] = []): Promi
 
   const toolsUsed: AgentToolCall[] = [];
   const citations = new Set<string>();
+  const system = await buildSystem(sb);
+  const MAX_ROUNDS = 12;
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < MAX_ROUNDS; i++) {
     const resp = await anthropic.messages.create({
       model: AGENT_MODEL,
-      max_tokens: 1500,
-      system: SYSTEM,
+      max_tokens: 2000,
+      system,
       tools: TOOLS,
       messages,
     });
@@ -207,8 +249,30 @@ export async function runAgent(message: string, history: ChatTurn[] = []): Promi
     messages.push({ role: "user", content: toolResults });
   }
 
+  // Estourou as rodadas de pesquisa: em vez de descartar tudo, pede a resposta final
+  // SEM ferramentas, usando o que já foi coletado.
+  messages.push({
+    role: "user",
+    content:
+      "Pare de pesquisar e responda agora com base no que você já coletou nesta conversa. " +
+      "Se algum dado não foi possível apurar, diga isso explicitamente — mas entregue tudo o que descobriu.",
+  });
+  const final = await anthropic.messages.create({
+    model: AGENT_MODEL,
+    max_tokens: 2000,
+    system,
+    messages,
+  });
+  const answer = final.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
+
   return {
-    answer: "A consulta ficou complexa demais. Tente reformular a pergunta de forma mais específica.",
+    answer:
+      answer ||
+      "Não consegui concluir a pesquisa. Tente reformular a pergunta de forma mais específica.",
     tools: toolsUsed,
     citations: [...citations].slice(0, 6),
   };
