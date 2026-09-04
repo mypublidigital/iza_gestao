@@ -13,7 +13,16 @@ import {
   loadConversations,
 } from "@/lib/data";
 import { num, pct } from "@/lib/format";
-import { canRunRealAgent, runAgent, type ChatTurn } from "@/lib/agent";
+import { canRunRealAgent, extractLearnings, runAgent, type ChatTurn } from "@/lib/agent";
+import {
+  createChat,
+  loadMessages,
+  recentLearnings,
+  saveLearnings,
+  saveMessage,
+  toTurns,
+} from "@/lib/agent-store";
+import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { getSessionUser, isAuthConfigured } from "@/lib/supabase/rsc";
 import type { Conversation } from "@/lib/types";
 
@@ -136,25 +145,66 @@ function responder(pergunta: string, all: Conversation[]): AgentReply {
 }
 
 export async function POST(req: Request) {
-  if (isAuthConfigured() && !(await getSessionUser())) {
+  const user = isAuthConfigured() ? await getSessionUser() : null;
+  if (isAuthConfigured() && !user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const { message, history } = (await req.json()) as {
+  const { message, chatId: chatIdIn } = (await req.json()) as {
     message: string;
-    history?: ChatTurn[];
+    chatId?: string | null;
   };
+  const pergunta = message ?? "";
+  const sb = getSupabaseAdmin();
+  const userId = user?.id ?? null;
 
-  // Agente real (Claude Sonnet + tool use) quando configurado; senão, lógica local.
-  if (canRunRealAgent()) {
+  // 1) Conversa persistida: usa a existente ou cria uma nova.
+  let chatId = chatIdIn ?? null;
+  let history: ChatTurn[] = [];
+  let learnings: string[] = [];
+  if (sb) {
     try {
-      const reply = await runAgent(message ?? "", history ?? []);
-      return NextResponse.json(reply);
+      if (!chatId) chatId = await createChat(sb, userId, pergunta);
+      if (chatId) history = toTurns(await loadMessages(sb, chatId));
+      learnings = await recentLearnings(sb);
+      if (chatId) await saveMessage(sb, chatId, { role: "user", content: pergunta });
     } catch (e) {
-      console.error("[agente] agente real falhou, usando fallback:", e);
+      console.error("[agente] memória indisponível:", e);
     }
   }
 
-  const all = await loadConversations({});
-  return NextResponse.json(responder(message ?? "", all));
+  // 2) Resposta: agente real (Claude + tool use) ou lógica local de fallback.
+  let reply: AgentReply;
+  let usouAgenteReal = false;
+  if (canRunRealAgent()) {
+    try {
+      reply = await runAgent(pergunta, history, learnings);
+      usouAgenteReal = true;
+    } catch (e) {
+      console.error("[agente] agente real falhou, usando fallback:", e);
+      reply = responder(pergunta, await loadConversations({}));
+    }
+  } else {
+    reply = responder(pergunta, await loadConversations({}));
+  }
+
+  // 3) Persiste a resposta e extrai aprendizados para as próximas conversas.
+  if (sb && chatId) {
+    try {
+      await saveMessage(sb, chatId, {
+        role: "agent",
+        content: reply.answer,
+        tools: reply.tools,
+        citations: reply.citations,
+      });
+      if (usouAgenteReal) {
+        const aprendidos = await extractLearnings(pergunta, reply.answer);
+        await saveLearnings(sb, chatId, aprendidos);
+      }
+    } catch (e) {
+      console.error("[agente] falha ao salvar:", e);
+    }
+  }
+
+  return NextResponse.json({ ...reply, chatId });
 }

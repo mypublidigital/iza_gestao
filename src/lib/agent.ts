@@ -4,7 +4,7 @@
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getAnthropic, AGENT_MODEL } from "@/lib/anthropic";
+import { getAnthropic, AGENT_MODEL, ENRICH_MODEL } from "@/lib/anthropic";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export interface AgentToolCall {
@@ -165,7 +165,7 @@ export function canRunRealAgent(): boolean {
 
 /** Contexto dinâmico: data de hoje (São Paulo) e nomes reais dos atendentes.
  *  Evita que o agente erre o ano em perguntas por mês e que procure nomes inexistentes. */
-async function buildSystem(sb: SupabaseClient): Promise<string> {
+async function buildSystem(sb: SupabaseClient, learnings: string[] = []): Promise<string> {
   const hoje = new Intl.DateTimeFormat("pt-BR", {
     timeZone: "America/Sao_Paulo",
     dateStyle: "full",
@@ -187,11 +187,65 @@ async function buildSystem(sb: SupabaseClient): Promise<string> {
     `"este mês", "julho", "últimos 30 dias" etc.\n` +
     (atendentes.length
       ? `- Atendentes humanos existentes (nomes EXATOS como estão no banco): ${atendentes.join(", ")}.\n`
-      : `- Ainda não há atendentes registrados nas conversas.\n`)
+      : `- Ainda não há atendentes registrados nas conversas.\n`) +
+    (learnings.length
+      ? `\nAprendizados de conversas anteriores com a equipe (use como contexto; se algo contradisser ` +
+        `os dados atuais, confie nos dados):\n${learnings.map((l) => `- ${l}`).join("\n")}\n`
+      : "")
   );
 }
 
-export async function runAgent(message: string, history: ChatTurn[] = []): Promise<AgentReply> {
+/** Extrai 0–3 aprendizados duráveis da interação, para reaproveitar em conversas futuras. */
+export async function extractLearnings(pergunta: string, resposta: string): Promise<string[]> {
+  const anthropic = getAnthropic();
+  if (!anthropic) return [];
+  try {
+    const msg = await anthropic.messages.create({
+      model: ENRICH_MODEL,
+      max_tokens: 400,
+      system:
+        "Você observa conversas entre a equipe da Iza Travel e um assistente de dados. " +
+        "Extraia apenas APRENDIZADOS DURÁVEIS e reutilizáveis: preferências da equipe, apelidos/nomes " +
+        "(ex.: 'a equipe chama Dany Amaral de Danielly'), definições de negócio, métricas que costumam pedir, " +
+        "ou fatos estáveis sobre a operação. NÃO extraia números pontuais nem fatos que mudam a cada dia " +
+        "(ex.: 'houve 35 conversas em julho'). Se não houver nada durável, devolva lista vazia.",
+      tools: [
+        {
+          name: "registrar_aprendizados",
+          description: "Registra aprendizados duráveis da interação.",
+          input_schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              aprendizados: {
+                type: "array",
+                items: { type: "string" },
+                description: "0 a 3 frases curtas em português, autoexplicativas fora do contexto.",
+              },
+            },
+            required: ["aprendizados"],
+          },
+        },
+      ],
+      tool_choice: { type: "tool", name: "registrar_aprendizados" },
+      messages: [
+        { role: "user", content: `Pergunta da equipe:\n${pergunta}\n\nResposta do assistente:\n${resposta.slice(0, 4000)}` },
+      ],
+    });
+    const block = msg.content.find((b) => b.type === "tool_use");
+    if (!block || block.type !== "tool_use") return [];
+    const out = (block.input as { aprendizados?: unknown }).aprendizados;
+    return Array.isArray(out) ? out.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function runAgent(
+  message: string,
+  history: ChatTurn[] = [],
+  learnings: string[] = [],
+): Promise<AgentReply> {
   const anthropic = getAnthropic();
   const sb = getSupabaseAdmin();
   if (!anthropic || !sb) throw new Error("agente real não configurado");
@@ -206,7 +260,7 @@ export async function runAgent(message: string, history: ChatTurn[] = []): Promi
 
   const toolsUsed: AgentToolCall[] = [];
   const citations = new Set<string>();
-  const system = await buildSystem(sb);
+  const system = await buildSystem(sb, learnings);
   const MAX_ROUNDS = 12;
 
   for (let i = 0; i < MAX_ROUNDS; i++) {

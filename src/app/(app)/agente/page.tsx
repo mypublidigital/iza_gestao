@@ -1,18 +1,24 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, Database, Search, Send, User } from "lucide-react";
+import { Bot, Database, MessageSquarePlus, Search, Send, Trash2, User } from "lucide-react";
 import { PageHeader } from "@/components/ui";
-import type { AgentReply, AgentToolCall } from "@/app/api/agente/route";
+import type { AgentToolCall } from "@/app/api/agente/route";
 
 interface Turn {
   role: "user" | "agent";
   text: string;
   tools?: AgentToolCall[];
   citations?: string[];
+}
+
+interface ChatSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
 }
 
 const SUGESTOES = [
@@ -27,11 +33,60 @@ export default function AgentePage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [chats, setChats] = useState<ChatSummary[]>([]);
+  const [chatId, setChatId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const carregarChats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/agente/chats");
+      const data = await res.json();
+      setChats(data.chats ?? []);
+    } catch {
+      /* ignora */
+    }
+  }, []);
+
+  useEffect(() => {
+    carregarChats();
+  }, [carregarChats]);
+
+  async function abrirChat(id: string) {
+    if (loading) return;
+    setChatId(id);
+    try {
+      const res = await fetch(`/api/agente/chats/${id}`);
+      const data = await res.json();
+      setTurns(
+        (data.messages ?? []).map((m: Turn & { content: string }) => ({
+          role: m.role,
+          text: m.content,
+          tools: m.tools,
+          citations: m.citations,
+        })),
+      );
+    } catch {
+      setTurns([]);
+    }
+    setTimeout(() => endRef.current?.scrollIntoView(), 50);
+  }
+
+  function novaConversa() {
+    if (loading) return;
+    setChatId(null);
+    setTurns([]);
+    setInput("");
+  }
+
+  async function excluirChat(id: string) {
+    if (!confirm("Excluir esta conversa?")) return;
+    await fetch(`/api/agente/chats/${id}`, { method: "DELETE" });
+    if (id === chatId) novaConversa();
+    carregarChats();
+  }
 
   async function send(text: string) {
     if (!text.trim() || loading) return;
-    const history = turns.map((t) => ({ role: t.role, text: t.text }));
     setTurns((t) => [...t, { role: "user", text }]);
     setInput("");
     setLoading(true);
@@ -40,13 +95,15 @@ export default function AgentePage() {
       const res = await fetch("/api/agente", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify({ message: text, chatId }),
       });
-      const data: AgentReply = await res.json();
+      const data = await res.json();
+      if (data.chatId && data.chatId !== chatId) setChatId(data.chatId);
       setTurns((t) => [
         ...t,
         { role: "agent", text: data.answer, tools: data.tools, citations: data.citations },
       ]);
+      carregarChats();
     } catch {
       setTurns((t) => [...t, { role: "agent", text: "Erro ao consultar o agente." }]);
     } finally {
@@ -62,6 +119,8 @@ export default function AgentePage() {
         subtitle="Pergunte em linguagem natural sobre as conversas atendidas pela IA"
       />
 
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="mx-auto max-w-3xl space-y-5">
           {turns.length === 0 && (
@@ -122,8 +181,60 @@ export default function AgentePage() {
           </button>
         </form>
         <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted">
-          Modo protótipo — respostas computadas sobre dados simulados. Em produção: Claude Sonnet com tool use real.
+          As conversas ficam salvas e o agente aprende com elas a cada interação.
         </p>
+      </div>
+        </div>
+
+        {/* Histórico de conversas (lateral direita) */}
+        <aside className="hidden w-72 shrink-0 flex-col border-l bg-surface lg:flex">
+          <div className="border-b p-3">
+            <button
+              onClick={novaConversa}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary-strong"
+            >
+              <MessageSquarePlus size={16} />
+              Nova conversa
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-2">
+            {chats.length === 0 ? (
+              <p className="p-3 text-xs text-muted">Suas conversas com o agente aparecerão aqui.</p>
+            ) : (
+              <ul className="space-y-1">
+                {chats.map((c) => (
+                  <li key={c.id} className="group relative">
+                    <button
+                      onClick={() => abrirChat(c.id)}
+                      className={`w-full rounded-lg px-3 py-2 pr-8 text-left text-sm transition ${
+                        c.id === chatId
+                          ? "bg-primary-soft text-primary-strong"
+                          : "text-foreground hover:bg-surface-2"
+                      }`}
+                    >
+                      <span className="block truncate">{c.title}</span>
+                      <span className="block text-[11px] text-muted">
+                        {new Date(c.updatedAt).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => excluirChat(c.id)}
+                      title="Excluir conversa"
+                      className="absolute right-1.5 top-2.5 hidden rounded p-1 text-muted hover:text-negativo group-hover:block"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
