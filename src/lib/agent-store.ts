@@ -24,7 +24,7 @@ function titleFrom(message: string): string {
 }
 
 export async function listChats(sb: SupabaseClient, userId: string | null): Promise<ChatSummary[]> {
-  let q = sb.from("agent_chats").select("id,title,updated_at").order("updated_at", { ascending: false }).limit(50);
+  let q = sb.from("agent_chats").select("id,title,updated_at").order("updated_at", { ascending: false }).limit(500);
   q = userId ? q.eq("user_id", userId) : q.is("user_id", null);
   const { data, error } = await q;
   if (error || !data) return [];
@@ -79,6 +79,28 @@ export async function saveMessage(
     citations: msg.citations ?? [],
   });
   await sb.from("agent_chats").update({ updated_at: new Date().toISOString() }).eq("id", chatId);
+}
+
+/** A conversa pertence ao usuário? (evita abrir/alterar conversa alheia) */
+export async function ownsChat(sb: SupabaseClient, chatId: string, userId: string | null): Promise<boolean> {
+  let q = sb.from("agent_chats").select("id").eq("id", chatId);
+  q = userId ? q.eq("user_id", userId) : q.is("user_id", null);
+  const { data } = await q.maybeSingle();
+  return !!data;
+}
+
+export async function renameChat(
+  sb: SupabaseClient,
+  chatId: string,
+  userId: string | null,
+  title: string,
+): Promise<boolean> {
+  const t = title.trim().replace(/\s+/g, " ").slice(0, 120);
+  if (!t) return false;
+  let q = sb.from("agent_chats").update({ title: t }).eq("id", chatId);
+  q = userId ? q.eq("user_id", userId) : q.is("user_id", null);
+  const { error } = await q;
+  return !error;
 }
 
 export async function deleteChat(sb: SupabaseClient, chatId: string, userId: string | null): Promise<void> {

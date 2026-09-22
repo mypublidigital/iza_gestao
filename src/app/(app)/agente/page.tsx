@@ -4,7 +4,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, Database, MessageSquarePlus, Search, Send, Trash2, User } from "lucide-react";
+import {
+  Bot,
+  Check,
+  Database,
+  History,
+  MessageSquarePlus,
+  Pencil,
+  Search,
+  Send,
+  Trash2,
+  User,
+  X,
+} from "lucide-react";
 import { PageHeader } from "@/components/ui";
 import type { AgentToolCall } from "@/app/api/agente/route";
 
@@ -35,6 +47,8 @@ export default function AgentePage() {
   const [loading, setLoading] = useState(false);
   const [chats, setChats] = useState<ChatSummary[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const carregarChats = useCallback(async () => {
@@ -54,6 +68,7 @@ export default function AgentePage() {
   async function abrirChat(id: string) {
     if (loading) return;
     setChatId(id);
+    setHistoricoAberto(false);
     try {
       const res = await fetch(`/api/agente/chats/${id}`);
       const data = await res.json();
@@ -76,12 +91,29 @@ export default function AgentePage() {
     setChatId(null);
     setTurns([]);
     setInput("");
+    setHistoricoAberto(false);
   }
 
   async function excluirChat(id: string) {
-    if (!confirm("Excluir esta conversa?")) return;
+    if (!confirm("Excluir esta conversa? Essa ação não pode ser desfeita.")) return;
+    setChats((cs) => cs.filter((c) => c.id !== id));
     await fetch(`/api/agente/chats/${id}`, { method: "DELETE" });
     if (id === chatId) novaConversa();
+    carregarChats();
+  }
+
+  async function renomearChat(id: string, title: string) {
+    const t = title.trim();
+    setEditandoId(null);
+    const atual = chats.find((c) => c.id === id);
+    if (!t || t === atual?.title) return;
+    setChats((cs) => cs.map((c) => (c.id === id ? { ...c, title: t } : c)));
+    const res = await fetch(`/api/agente/chats/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: t }),
+    });
+    if (!res.ok) alert("Não foi possível renomear a conversa.");
     carregarChats();
   }
 
@@ -117,6 +149,15 @@ export default function AgentePage() {
       <PageHeader
         title="Agente"
         subtitle="Pergunte em linguagem natural sobre as conversas atendidas pela IA"
+        actions={
+          <button
+            onClick={() => setHistoricoAberto((v) => !v)}
+            className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm text-foreground transition hover:border-primary hover:text-primary lg:hidden"
+          >
+            <History size={16} />
+            Histórico ({chats.length})
+          </button>
+        }
       />
 
       <div className="flex min-h-0 flex-1">
@@ -187,56 +228,135 @@ export default function AgentePage() {
         </div>
 
         {/* Histórico de conversas (lateral direita) */}
-        <aside className="hidden w-72 shrink-0 flex-col border-l bg-surface lg:flex">
-          <div className="border-b p-3">
+        {historicoAberto && (
+          <div
+            className="fixed inset-0 z-30 bg-black/30 lg:hidden"
+            onClick={() => setHistoricoAberto(false)}
+          />
+        )}
+        <aside
+          className={`${
+            historicoAberto ? "fixed inset-y-0 right-0 z-40 flex shadow-xl" : "hidden"
+          } w-72 shrink-0 flex-col border-l bg-surface lg:static lg:z-auto lg:flex lg:shadow-none`}
+        >
+          <div className="flex items-center gap-2 border-b p-3">
             <button
               onClick={novaConversa}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary-strong"
+              className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-white transition hover:bg-primary-strong"
             >
               <MessageSquarePlus size={16} />
               Nova conversa
             </button>
+            <button
+              onClick={() => setHistoricoAberto(false)}
+              title="Fechar"
+              className="rounded-lg p-2 text-muted hover:bg-surface-2 lg:hidden"
+            >
+              <X size={16} />
+            </button>
           </div>
+          <p className="px-4 pt-3 text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Conversas salvas ({chats.length})
+          </p>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {chats.length === 0 ? (
               <p className="p-3 text-xs text-muted">Suas conversas com o agente aparecerão aqui.</p>
             ) : (
               <ul className="space-y-1">
-                {chats.map((c) => (
-                  <li key={c.id} className="group relative">
-                    <button
-                      onClick={() => abrirChat(c.id)}
-                      className={`w-full rounded-lg px-3 py-2 pr-8 text-left text-sm transition ${
-                        c.id === chatId
-                          ? "bg-primary-soft text-primary-strong"
-                          : "text-foreground hover:bg-surface-2"
-                      }`}
-                    >
-                      <span className="block truncate">{c.title}</span>
-                      <span className="block text-[11px] text-muted">
-                        {new Date(c.updatedAt).toLocaleString("pt-BR", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => excluirChat(c.id)}
-                      title="Excluir conversa"
-                      className="absolute right-1.5 top-2.5 hidden rounded p-1 text-muted hover:text-negativo group-hover:block"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </li>
-                ))}
+                {chats.map((c) =>
+                  editandoId === c.id ? (
+                    <li key={c.id}>
+                      <RenameForm
+                        initial={c.title}
+                        onSave={(t) => renomearChat(c.id, t)}
+                        onCancel={() => setEditandoId(null)}
+                      />
+                    </li>
+                  ) : (
+                    <li key={c.id} className="group relative">
+                      <button
+                        onClick={() => abrirChat(c.id)}
+                        onDoubleClick={() => setEditandoId(c.id)}
+                        className={`w-full rounded-lg px-3 py-2 pr-14 text-left text-sm transition ${
+                          c.id === chatId
+                            ? "bg-primary-soft text-primary-strong"
+                            : "text-foreground hover:bg-surface-2"
+                        }`}
+                      >
+                        <span className="block truncate" title={c.title}>
+                          {c.title}
+                        </span>
+                        <span className="block text-[11px] text-muted">
+                          {new Date(c.updatedAt).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </button>
+                      <div className="absolute right-1.5 top-2 flex gap-0.5 lg:hidden lg:group-hover:flex">
+                        <button
+                          onClick={() => setEditandoId(c.id)}
+                          title="Renomear conversa"
+                          className="rounded p-1 text-muted hover:bg-surface hover:text-primary"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          onClick={() => excluirChat(c.id)}
+                          title="Excluir conversa"
+                          className="rounded p-1 text-muted hover:bg-surface hover:text-negativo"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </li>
+                  ),
+                )}
               </ul>
             )}
           </div>
         </aside>
       </div>
     </div>
+  );
+}
+
+function RenameForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  onSave: (title: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initial);
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(value);
+      }}
+      className="flex items-center gap-1 rounded-lg bg-surface-2 p-1.5"
+    >
+      <input
+        autoFocus
+        value={value}
+        maxLength={120}
+        onChange={(e) => setValue(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+        className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+      />
+      <button type="submit" title="Salvar" className="rounded p-1 text-primary hover:bg-surface">
+        <Check size={15} />
+      </button>
+      <button type="button" onClick={onCancel} title="Cancelar" className="rounded p-1 text-muted hover:bg-surface">
+        <X size={15} />
+      </button>
+    </form>
   );
 }
 

@@ -17,6 +17,7 @@ import { canRunRealAgent, extractLearnings, runAgent, type ChatTurn } from "@/li
 import {
   createChat,
   loadMessages,
+  ownsChat,
   recentLearnings,
   saveLearnings,
   saveMessage,
@@ -164,6 +165,8 @@ export async function POST(req: Request) {
   let learnings: string[] = [];
   if (sb) {
     try {
+      // Só continua uma conversa que pertença ao usuário; senão abre uma nova.
+      if (chatId && !(await ownsChat(sb, chatId, userId))) chatId = null;
       if (!chatId) chatId = await createChat(sb, userId, pergunta);
       if (chatId) history = toTurns(await loadMessages(sb, chatId));
       learnings = await recentLearnings(sb);
